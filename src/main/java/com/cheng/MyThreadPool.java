@@ -2,7 +2,6 @@ package com.cheng;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -17,13 +16,15 @@ public class MyThreadPool {
     private final int timeout;
 
     private final TimeUnit timeUnit;
+    private final RejectHandle rejectHandle;
 
-    public MyThreadPool(int corePoolSize, int maxSize, int timeout, TimeUnit timeUnit, BlockingQueue<Runnable> blockingQueue) {
+    public MyThreadPool(int corePoolSize, int maxSize, int timeout, TimeUnit timeUnit, BlockingQueue<Runnable> blockingQueue, RejectHandle rejectHandle) {
         this.corePoolSize = corePoolSize;
         this.maxSize = maxSize;
         this.timeout = timeout;
         this.timeUnit = timeUnit;
         this.blockingQueue = blockingQueue;
+        this.rejectHandle = rejectHandle;
     }
 
 
@@ -41,17 +42,20 @@ public class MyThreadPool {
         }
 
         if (blockingQueue.offer(command)) {
+            System.out.println("成功放入阻塞队列");
             return;
         }
 
         if (coreList.size() + supportList.size() < maxSize) {
+            System.out.println("队列扩容");
             Thread thread = new supportThread();
             supportList.add(thread);
             thread.start();
         }
 
         if (!blockingQueue.offer(command)) {
-            throw new RuntimeException("阻塞队列满了");
+            System.out.println("阻塞队列满了");
+            rejectHandle.reject(command, this);
         }
     }
 
