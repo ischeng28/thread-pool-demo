@@ -47,5 +47,9 @@ public class MyThreadPool {
             supportList.add(thread);
             thread.start();
         }
+
+        if (!blockingQueue.offer(command)) {
+            throw new RuntimeException("阻塞队列满了");
+        }
     }
 }
