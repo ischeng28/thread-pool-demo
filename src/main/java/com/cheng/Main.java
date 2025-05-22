@@ -5,7 +5,17 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
     public static void main(String[] args) {
-        MyThreadPool myThreadPool = new MyThreadPool(2, 4, 1, TimeUnit.SECONDS, new ArrayBlockingQueue<>(2), new DiscardRejectHandle());
+        // 使用自定义线程工厂
+        ThreadFactory customThreadFactory = new CustomThreadFactory("MyCustomThread");
+        
+        // 创建使用自定义线程工厂的线程池
+        MyThreadPool myThreadPool = new MyThreadPool(
+            2, 4, 1, TimeUnit.SECONDS, 
+            new ArrayBlockingQueue<>(2), 
+            new DiscardRejectHandle(),
+            customThreadFactory
+        );
+        
         for (int i = 0; i < 8; i++) {
             final int fi = i;
             myThreadPool.execute(() -> {
@@ -42,5 +52,28 @@ public class Main {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        
+        // 演示使用默认线程工厂
+        System.out.println("\n使用默认线程工厂的线程池:");
+        MyThreadPool defaultPoolThreadPool = new MyThreadPool(
+            2, 4, 1, TimeUnit.SECONDS, 
+            new ArrayBlockingQueue<>(2), 
+            new DiscardRejectHandle()
+        );
+        
+        for (int i = 0; i < 3; i++) {
+            final int fi = i;
+            defaultPoolThreadPool.execute(() -> {
+                System.out.println("默认线程工厂: " + Thread.currentThread().getName() + '/' + fi);
+            });
+        }
+        
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        
+        defaultPoolThreadPool.shutdown();
     }
 }

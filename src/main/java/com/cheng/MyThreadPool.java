@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class MyThreadPool {
 
@@ -18,6 +17,7 @@ public class MyThreadPool {
 
     private final TimeUnit timeUnit;
     private final RejectHandle rejectHandle;
+    private final ThreadFactory threadFactory;
     
     // 添加线程池状态枚举
     private enum PoolState {
@@ -30,15 +30,22 @@ public class MyThreadPool {
     // 添加线程池状态字段
     private volatile PoolState state = PoolState.RUNNING;
 
-    public MyThreadPool(int corePoolSize, int maxSize, int timeout, TimeUnit timeUnit, BlockingQueue<Runnable> blockingQueue, RejectHandle rejectHandle) {
+    public MyThreadPool(int corePoolSize, int maxSize, int timeout, TimeUnit timeUnit, 
+                       BlockingQueue<Runnable> blockingQueue, RejectHandle rejectHandle) {
+        this(corePoolSize, maxSize, timeout, timeUnit, blockingQueue, rejectHandle, new DefaultThreadFactory());
+    }
+    
+    public MyThreadPool(int corePoolSize, int maxSize, int timeout, TimeUnit timeUnit, 
+                       BlockingQueue<Runnable> blockingQueue, RejectHandle rejectHandle, 
+                       ThreadFactory threadFactory) {
         this.corePoolSize = corePoolSize;
         this.maxSize = maxSize;
         this.timeout = timeout;
         this.timeUnit = timeUnit;
         this.blockingQueue = blockingQueue;
         this.rejectHandle = rejectHandle;
+        this.threadFactory = threadFactory;
     }
-
 
     // 我们的线程池中应该有多少个线程
     List<Thread> coreList = new ArrayList<>();
@@ -54,7 +61,7 @@ public class MyThreadPool {
         }
         
         if (coreList.size() < corePoolSize) {
-            Thread thread = new coreThread();
+            Thread thread = threadFactory.newThread(new CoreWorker());
             coreList.add(thread);
             thread.start();
         }
@@ -66,7 +73,7 @@ public class MyThreadPool {
 
         if (coreList.size() + supportList.size() < maxSize) {
             System.out.println("队列扩容");
-            Thread thread = new supportThread();
+            Thread thread = threadFactory.newThread(new SupportWorker());
             supportList.add(thread);
             thread.start();
         }
@@ -77,15 +84,14 @@ public class MyThreadPool {
         }
     }
 
-    class coreThread extends Thread {
+    // 使用Runnable替代继承Thread
+    class CoreWorker implements Runnable {
         @Override
         public void run() {
             while (state != PoolState.STOP) {
                 try {
                     Runnable command = blockingQueue.take();
                     command.run();
-                    //     等待阻塞队列被填充元素的过程中，如果thread被中断了，不会继续等待，而去处理异常
-                    //     几乎所有需要线程等待的函数，都有这个异常
                 } catch (InterruptedException e) {
                     // 线程被中断，可能是因为shutdown()或shutdownNow()被调用
                     if (state == PoolState.STOP) {
@@ -94,7 +100,7 @@ public class MyThreadPool {
                 }
             }
             synchronized (coreList) {
-                coreList.remove(this);
+                coreList.remove(Thread.currentThread());
                 if (isTerminated()) {
                     state = PoolState.TERMINATED;
                 }
@@ -103,7 +109,7 @@ public class MyThreadPool {
         }
     }
 
-    class supportThread extends Thread {
+    class SupportWorker implements Runnable {
         @Override
         public void run() {
             while (state != PoolState.STOP) {
@@ -121,7 +127,7 @@ public class MyThreadPool {
                 }
             }
             synchronized (supportList) {
-                supportList.remove(this);
+                supportList.remove(Thread.currentThread());
                 if (isTerminated()) {
                     state = PoolState.TERMINATED;
                 }
