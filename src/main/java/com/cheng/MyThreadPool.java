@@ -9,7 +9,7 @@ public class MyThreadPool {
 
     BlockingQueue<Runnable> commandList = new ArrayBlockingQueue<>(1024);
 
-    Thread thread = new Thread(() -> {
+    private final Runnable task = () -> {
         while (true) {
             try {
                 Runnable command = commandList.take();
@@ -20,20 +20,18 @@ public class MyThreadPool {
                 throw new RuntimeException(e);
             }
         }
-    },"唯一线程");
+    };
+    private int corePoolSize = 10;
 
-    {
-        thread.start();
-    }
+    // 我们的线程池中应该有多少个线程
+    List<Thread> threadList = new ArrayList<>(corePoolSize);
 
-    // 1.线程什么时候创建
-    // 2.线程的runnable是什么?是我们提交的command吗?
     public void execute(Runnable command) {
-        // 这种方式存在的问题
-        // 1.频繁创建线程消耗资源
-        // 2.创建的线程没有被管理起来
-
-        //  offer会通过返回值判断是否成功向队列中添加元素，而不是抛异常
+        if (threadList.size() < corePoolSize) {
+            Thread thread = new Thread(task);
+            threadList.add(thread);
+            thread.start();
+        }
         boolean offer = commandList.offer(command);
     }
 }
