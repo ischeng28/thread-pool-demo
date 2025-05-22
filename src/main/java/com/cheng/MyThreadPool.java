@@ -7,12 +7,12 @@ import java.util.concurrent.BlockingQueue;
 
 public class MyThreadPool {
 
-    BlockingQueue<Runnable> commandList = new ArrayBlockingQueue<>(1024);
+    BlockingQueue<Runnable> blockingQueue = new ArrayBlockingQueue<>(1024);
 
     private final Runnable task = () -> {
         while (true) {
             try {
-                Runnable command = commandList.take();
+                Runnable command = blockingQueue.take();
                 command.run();
                 //     等待阻塞队列被填充元素的过程中，如果thread被中断了，不会继续等待，而去处理异常
                 //     几乎所有需要线程等待的函数，都有这个异常
@@ -23,15 +23,29 @@ public class MyThreadPool {
     };
     private int corePoolSize = 10;
 
-    // 我们的线程池中应该有多少个线程
-    List<Thread> threadList = new ArrayList<>(corePoolSize);
+    private int maxSize = 16;
 
+    // 我们的线程池中应该有多少个线程
+    List<Thread> coreList = new ArrayList<>();
+
+    List<Thread> supportList = new ArrayList<>();
+
+    // 是有线程安全问题的
     public void execute(Runnable command) {
-        if (threadList.size() < corePoolSize) {
+        if (coreList.size() < corePoolSize) {
             Thread thread = new Thread(task);
-            threadList.add(thread);
+            coreList.add(thread);
             thread.start();
         }
-        boolean offer = commandList.offer(command);
+
+        if (blockingQueue.offer(command)) {
+            return;
+        }
+
+        if (coreList.size() + supportList.size() < maxSize) {
+            Thread thread = new Thread(task);
+            supportList.add(thread);
+            thread.start();
+        }
     }
 }
